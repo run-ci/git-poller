@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -22,9 +23,10 @@ type pollerRequest struct {
 }
 
 type gitPoller struct {
-	remote string
-	branch string
-	agent  *run.Agent
+	remote   string
+	branch   string
+	agent    *run.Agent
+	lastHead string
 }
 
 func (gp *gitPoller) Poll(ctx context.Context) error {
@@ -44,7 +46,7 @@ func (gp *gitPoller) Poll(ctx context.Context) error {
 		default:
 			logger.Info("running poller")
 
-			err := gp.cloneRepo()
+			err := gp.checkRepo()
 			if err != nil {
 				logger.WithError(err).Error("unable to clone git repo")
 			}
@@ -55,7 +57,7 @@ func (gp *gitPoller) Poll(ctx context.Context) error {
 	}
 }
 
-func (gp *gitPoller) cloneRepo() error {
+func (gp *gitPoller) checkRepo() error {
 	logger := logger.WithFields(logrus.Fields{
 		"poll":   "git",
 		"remote": gp.remote,
@@ -86,7 +88,23 @@ func (gp *gitPoller) cloneRepo() error {
 	}
 
 	logger.Infof("got repo head %v", head)
+	if head.String() != gp.lastHead {
+		logger.Info("head changed, parsing pipelines")
 
+		// TODO: parse pipelines
+
+		// TODO: send pipeline events to runlet
+
+		gp.lastHead = head.String()
+	}
+
+	err = os.RemoveAll(clonedir)
+	if err != nil {
+		logger.WithError(err).Debugf("unable to clean up clonedir %v", clonedir)
+		return err
+	}
+
+	logger.Debug("clonedir successfully deleted")
 	return nil
 }
 
