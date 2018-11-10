@@ -34,6 +34,7 @@ func (gp *gitPoller) Poll(ctx context.Context) error {
 		case <-done:
 			logger.Info("context done, shutting down poller")
 
+			return nil
 		default:
 			logger.Info("running poller")
 
@@ -86,5 +87,46 @@ func (srv *Server) runPoller(rw http.ResponseWriter, req *http.Request) {
 
 	srv.pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)
 
-	rw.WriteHeader(http.StatusOK)
+	rw.WriteHeader(http.StatusAccepted)
+}
+
+func (srv *Server) removePoller(rw http.ResponseWriter, req *http.Request) {
+	reqid := req.Context().Value(keyReqID).(string)
+	logger := logger.WithField("request_id", reqid)
+
+	params := req.URL.Query()
+	if val, ok := params["remote"]; !ok || len(val) == 0 {
+		logger.Error("missing 'remote' query parameter")
+
+		rw.WriteHeader(http.StatusBadRequest)
+		buf, err := json.Marshal(map[string]string{
+			"error": "missing 'remote' query parameter",
+		})
+		if err != nil {
+			return
+		}
+		rw.Write(buf)
+		return
+	}
+
+	if val, ok := params["branch"]; !ok || len(val) == 0 {
+		logger.Error("missing 'branch' query parameter")
+
+		rw.WriteHeader(http.StatusBadRequest)
+		buf, err := json.Marshal(map[string]string{
+			"error": "missing 'branch' query parameter",
+		})
+		if err != nil {
+			return
+		}
+		rw.Write(buf)
+		return
+	}
+
+	remote := params["remote"][0]
+	branch := params["branch"][0]
+
+	srv.pool.DeletePoller(fmt.Sprintf("%v#%v", remote, branch))
+
+	rw.WriteHeader(http.StatusAccepted)
 }

@@ -77,8 +77,8 @@ func (pool *Pool) Run() error {
 		case rmmsg := <-pool.rmChan:
 			logger := logger.WithField("key", rmmsg)
 			logger.Debug("removing poller")
-
 			ps := pool.db[rmmsg]
+
 			logger.Debug("killing poller")
 			ps.kill()
 		}

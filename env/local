@@ -1,3 +1,4 @@
 export POLLER_LOG_LEVEL=debug
 
 export TEST_POLLER=$(cat examples/poller.json)
+export TEST_REMOTE_URL_ENCODE=https%3A%2F%2Fgithub.com%2Frun-ci%2Frun.git
