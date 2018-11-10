@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/run-ci/git-poller/async"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,15 +26,19 @@ func init() {
 // the database connection.
 type Server struct {
 	*http.Server
+
+	pool *async.Pool
 }
 
 // NewServer returns a Server with a reference to `st`, listening
 // on `addr`.
-func NewServer(addr string) *Server {
+func NewServer(addr string, pool *async.Pool) *Server {
 	srv := &Server{
 		Server: &http.Server{
 			Addr: addr,
 		},
+
+		pool: pool,
 	}
 
 	r := mux.NewRouter()

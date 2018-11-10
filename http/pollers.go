@@ -1,7 +1,9 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -12,6 +14,33 @@ import (
 type pollerRequest struct {
 	Remote string `json:"remote"`
 	Branch string `json:"branch"`
+}
+
+type gitPoller struct {
+	remote string
+	branch string
+}
+
+func (gp *gitPoller) Poll(ctx context.Context) {
+	logger := logger.WithFields(logrus.Fields{
+		"poll":   "git",
+		"remote": gp.remote,
+		"branch": gp.branch,
+	})
+
+	done := ctx.Done()
+	for {
+		select {
+		case <-done:
+			logger.Info("context done, shutting down poller")
+
+		default:
+			logger.Info("running poller")
+
+			logger.Debug("sleeping")
+			time.Sleep(1 * time.Minute)
+		}
+	}
 }
 
 func (srv *Server) runPoller(rw http.ResponseWriter, req *http.Request) {
@@ -50,15 +79,12 @@ func (srv *Server) runPoller(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	go func(remote, branch string, logger *logrus.Entry) {
-		for {
-			logger.Info("running poller")
+	gp := &gitPoller{
+		remote: body.Remote,
+		branch: body.Branch,
+	}
 
-			logger.Debug("sleeping")
-			time.Sleep(1 * time.Minute)
-		}
-	}(body.Remote, body.Branch, logger.WithFields(logrus.Fields{
-		"remote": body.Remote,
-		"branch": body.Branch,
-	}))
+	srv.pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)
+
+	rw.WriteHeader(http.StatusOK)
 }
