@@ -8,7 +8,12 @@ import (
 	"net/http"
 	"time"
 
+	"gopkg.in/src-d/go-git.v4/plumbing"
+
+	"github.com/google/uuid"
+	"github.com/run-ci/run/pkg/run"
 	"github.com/sirupsen/logrus"
+	git "gopkg.in/src-d/go-git.v4"
 )
 
 type pollerRequest struct {
@@ -19,6 +24,7 @@ type pollerRequest struct {
 type gitPoller struct {
 	remote string
 	branch string
+	agent  *run.Agent
 }
 
 func (gp *gitPoller) Poll(ctx context.Context) error {
@@ -38,10 +44,50 @@ func (gp *gitPoller) Poll(ctx context.Context) error {
 		default:
 			logger.Info("running poller")
 
+			err := gp.cloneRepo()
+			if err != nil {
+				logger.WithError(err).Error("unable to clone git repo")
+			}
+
 			logger.Debug("sleeping")
 			time.Sleep(1 * time.Minute)
 		}
 	}
+}
+
+func (gp *gitPoller) cloneRepo() error {
+	logger := logger.WithFields(logrus.Fields{
+		"poll":   "git",
+		"remote": gp.remote,
+		"branch": gp.branch,
+	})
+
+	clonedir := fmt.Sprintf("/tmp/git-poller.%v", uuid.New())
+
+	opts := &git.CloneOptions{
+		URL:           gp.remote,
+		ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%v", gp.branch)),
+		SingleBranch:  true,
+		Depth:         1,
+	}
+
+	logger.Infof("cloning into %v", clonedir)
+
+	repo, err := git.PlainClone(clonedir, false, opts)
+	if err != nil {
+		logger.WithError(err).Debug("unable to clone repo")
+		return err
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		logger.WithError(err).Debug("unable to get repo HEAD")
+		return err
+	}
+
+	logger.Infof("got repo head %v", head)
+
+	return nil
 }
 
 func (srv *Server) runPoller(rw http.ResponseWriter, req *http.Request) {
