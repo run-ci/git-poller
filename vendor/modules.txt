@@ -216,3 +216,5 @@ gopkg.in/src-d/go-git.v4/plumbing/transport/internal/common
 gopkg.in/src-d/go-git.v4/plumbing/transport/server
 # gopkg.in/warnings.v0 v0.1.2
 gopkg.in/warnings.v0
+# gopkg.in/yaml.v2 v2.2.1
+gopkg.in/yaml.v2

@@ -37,4 +37,5 @@ require (
 	gopkg.in/ldap.v2 v2.5.1 // indirect
 	gopkg.in/src-d/go-git.v4 v4.7.1
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1 // indirect
+	gopkg.in/yaml.v2 v2.2.1
 )

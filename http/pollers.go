@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -16,6 +17,7 @@ import (
 	"github.com/run-ci/run/pkg/run"
 	"github.com/sirupsen/logrus"
 	git "gopkg.in/src-d/go-git.v4"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type pollerRequest struct {
@@ -87,6 +89,12 @@ func (gp *gitPoller) checkRepo() error {
 	head, err := repo.Head()
 	if err != nil {
 		logger.WithError(err).Debug("unable to get repo HEAD")
+
+		cleanerr := os.RemoveAll(clonedir)
+		if err != nil {
+			logger.WithError(cleanerr).Debugf("unable to clean up clonedir %v", clonedir)
+		}
+
 		return err
 	}
 
@@ -94,15 +102,67 @@ func (gp *gitPoller) checkRepo() error {
 	if head.String() != gp.lastHead {
 		logger.Info("head changed, parsing pipelines")
 
-		// TODO: parse pipelines
-		ev := runlet.Event{}
-
-		err := gp.queue.Send(ev)
+		files, err := ioutil.ReadDir(fmt.Sprintf("%v/pipelines", clonedir))
 		if err != nil {
-			logger.WithError(err).WithField("event", ev).
-				Debug("unable to send event on queue")
-
+			logger.WithError(err).Debug("unable to list pipeline files")
+			cleanerr := os.RemoveAll(clonedir)
+			if err != nil {
+				logger.WithError(cleanerr).Debugf("unable to clean up clonedir %v", clonedir)
+			}
 			return err
+		}
+		if len(files) == 0 {
+			cleanerr := os.RemoveAll(clonedir)
+			if err != nil {
+				logger.WithError(cleanerr).Debugf("unable to clean up clonedir %v", clonedir)
+			}
+
+			return nil
+		}
+
+		for _, finfo := range files {
+			name := strings.Split(finfo.Name(), ".")[0]
+			logger := logger.WithField("pipeline_name", name)
+
+			path := fmt.Sprintf("%v/pipelines/%v", clonedir, finfo.Name())
+			f, err := os.Open(path)
+			if err != nil {
+				logger.WithError(err).
+					Debugf("unable to open pipeline file at %v, skipping", path)
+
+				continue
+			}
+
+			buf, err := ioutil.ReadAll(f)
+			if err != nil {
+				logger.WithError(err).
+					Debugf("unable to read pipeline file at %v, skipping", path)
+
+				continue
+			}
+
+			var ev runlet.Event
+			err = yaml.UnmarshalStrict(buf, &ev)
+			if err != nil {
+				logger.WithError(err).
+					Debugf("unable to unmarshal pipeline for %v, skipping", path)
+
+				continue
+			}
+
+			ev.Remote = gp.remote
+			ev.Branch = gp.branch
+			ev.Name = name
+
+			logger = logger.WithField("event", ev)
+
+			err = gp.queue.Send(ev)
+			if err != nil {
+				logger.WithError(err).
+					Debug("unable to send event on queue, skipping")
+
+				continue
+			}
 		}
 
 		gp.lastHead = head.String()
