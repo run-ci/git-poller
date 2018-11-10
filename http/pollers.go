@@ -21,7 +21,7 @@ type gitPoller struct {
 	branch string
 }
 
-func (gp *gitPoller) Poll(ctx context.Context) {
+func (gp *gitPoller) Poll(ctx context.Context) error {
 	logger := logger.WithFields(logrus.Fields{
 		"poll":   "git",
 		"remote": gp.remote,
