@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/run-ci/git-poller/async"
+	"github.com/run-ci/git-poller/runlet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,18 +28,20 @@ func init() {
 type Server struct {
 	*http.Server
 
-	pool *async.Pool
+	pool  *async.Pool
+	queue runlet.Sender
 }
 
-// NewServer returns a Server with a reference to `st`, listening
-// on `addr`.
-func NewServer(addr string, pool *async.Pool) *Server {
+// NewServer returns a Server for pollers. It holds a reference to the
+// configured backing pool as well as the queue for sending pipeline events.
+func NewServer(addr string, pool *async.Pool, queue runlet.Sender) *Server {
 	srv := &Server{
 		Server: &http.Server{
 			Addr: addr,
 		},
 
-		pool: pool,
+		pool:  pool,
+		queue: queue,
 	}
 
 	r := mux.NewRouter()

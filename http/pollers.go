@@ -12,6 +12,7 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing"
 
 	"github.com/google/uuid"
+	"github.com/run-ci/git-poller/runlet"
 	"github.com/run-ci/run/pkg/run"
 	"github.com/sirupsen/logrus"
 	git "gopkg.in/src-d/go-git.v4"
@@ -27,6 +28,8 @@ type gitPoller struct {
 	branch   string
 	agent    *run.Agent
 	lastHead string
+
+	queue runlet.Sender
 }
 
 func (gp *gitPoller) Poll(ctx context.Context) error {
@@ -92,8 +95,15 @@ func (gp *gitPoller) checkRepo() error {
 		logger.Info("head changed, parsing pipelines")
 
 		// TODO: parse pipelines
+		ev := runlet.Event{}
 
-		// TODO: send pipeline events to runlet
+		err := gp.queue.Send(ev)
+		if err != nil {
+			logger.WithError(err).WithField("event", ev).
+				Debug("unable to send event on queue")
+
+			return err
+		}
 
 		gp.lastHead = head.String()
 	}
@@ -147,6 +157,7 @@ func (srv *Server) runPoller(rw http.ResponseWriter, req *http.Request) {
 	gp := &gitPoller{
 		remote: body.Remote,
 		branch: body.Branch,
+		queue:  srv.queue,
 	}
 
 	srv.pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)

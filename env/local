@@ -1,4 +1,5 @@
 export POLLER_LOG_LEVEL=debug
+export POLLER_NATS_URL=nats://queue:4222
 
 export TEST_POLLER=$(cat examples/poller.json)
 export TEST_REMOTE_URL_ENCODE=https%3A%2F%2Fgithub.com%2Frun-ci%2Frun.git

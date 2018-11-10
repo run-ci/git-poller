@@ -98,6 +98,12 @@ github.com/konsorten/go-windows-terminal-sequences
 github.com/mitchellh/go-homedir
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
+# github.com/nats-io/go-nats v1.6.0
+github.com/nats-io/go-nats
+github.com/nats-io/go-nats/encoders/builtin
+github.com/nats-io/go-nats/util
+# github.com/nats-io/nuid v1.0.0
+github.com/nats-io/nuid
 # github.com/opencontainers/go-digest v1.0.0-rc1
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
