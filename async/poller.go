@@ -86,6 +86,7 @@ func (pool *Pool) Run() error {
 			logger := logger.WithField("key", rmmsg)
 			logger.Debug("removing poller")
 			ps := pool.db[rmmsg]
+			delete(pool.db, rmmsg)
 
 			logger.Debug("killing poller")
 			ps.kill()
