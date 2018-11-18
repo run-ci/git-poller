@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -229,39 +230,40 @@ func (srv *Server) removePoller(rw http.ResponseWriter, req *http.Request) {
 	reqid := req.Context().Value(keyReqID).(string)
 	logger := logger.WithField("request_id", reqid)
 
-	params := req.URL.Query()
-	if val, ok := params["remote"]; !ok || len(val) == 0 {
-		logger.Error("missing 'remote' query parameter")
+	key, err := keyFromReq(req)
+	if err != nil {
+		logger.WithError(err).Error("unable to get poller key")
 
 		rw.WriteHeader(http.StatusBadRequest)
 		buf, err := json.Marshal(map[string]string{
-			"error": "missing 'remote' query parameter",
+			"error": err.Error(),
 		})
 		if err != nil {
+			logger.WithField("marshal_err", err).
+				Error("unable to marshal error response")
+
 			return
 		}
 		rw.Write(buf)
 		return
 	}
 
-	if val, ok := params["branch"]; !ok || len(val) == 0 {
-		logger.Error("missing 'branch' query parameter")
+	srv.pool.DeletePoller(key)
 
-		rw.WriteHeader(http.StatusBadRequest)
-		buf, err := json.Marshal(map[string]string{
-			"error": "missing 'branch' query parameter",
-		})
-		if err != nil {
-			return
-		}
-		rw.Write(buf)
-		return
+	rw.WriteHeader(http.StatusAccepted)
+}
+
+func keyFromReq(req *http.Request) (string, error) {
+	params := req.URL.Query()
+	if val, ok := params["remote"]; !ok || len(val) == 0 {
+		return "", errors.New("missing \"remote\" query parameter")
+	}
+
+	if val, ok := params["branch"]; !ok || len(val) == 0 {
+		return "", errors.New("missing \"branch\" query parameter")
 	}
 
 	remote := params["remote"][0]
 	branch := params["branch"][0]
-
-	srv.pool.DeletePoller(fmt.Sprintf("%v#%v", remote, branch))
-
-	rw.WriteHeader(http.StatusAccepted)
+	return fmt.Sprintf("%v#%v", remote, branch), nil
 }
