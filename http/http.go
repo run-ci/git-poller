@@ -56,6 +56,9 @@ func NewServer(addr string, pool *async.Pool, queue runlet.Sender) *Server {
 	r.Handle("/pollers", chain(srv.removePoller, setRequestID, logRequest)).
 		Methods(http.MethodDelete)
 
+	r.Handle("/pollers", chain(srv.getPollers, setRequestID, logRequest)).
+		Methods(http.MethodGet)
+
 	return srv
 }
 

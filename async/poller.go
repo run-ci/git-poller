@@ -25,8 +25,13 @@ type msgAddProc struct {
 type Pool struct {
 	db map[string]proc
 
+	// signal channels
 	addChan chan msgAddProc
 	rmChan  chan string
+	getChan chan struct{}
+
+	// This is for output of keys coming from the pool.
+	outChan chan string
 }
 
 // NewPool returns a Pool with all its components initialized.
@@ -38,6 +43,9 @@ func NewPool() *Pool {
 
 		addChan: make(chan msgAddProc),
 		rmChan:  make(chan string),
+		getChan: make(chan struct{}),
+
+		outChan: make(chan string),
 	}
 }
 
@@ -81,6 +89,16 @@ func (pool *Pool) Run() error {
 
 			logger.Debug("killing poller")
 			ps.kill()
+
+		case <-pool.getChan:
+			// In order to keep everything safe without needing a lock, a "get" request
+			// needs to be processed in this loop as well.
+			for k := range pool.db {
+				pool.outChan <- k
+			}
+
+			close(pool.outChan)
+			pool.outChan = make(chan string)
 		}
 	}
 }
@@ -104,4 +122,19 @@ func (pool *Pool) AddPoller(key string, plr Poller) {
 // will happen.
 func (pool *Pool) DeletePoller(key string) {
 	pool.rmChan <- key
+}
+
+// GetPollers returns a list of all poller keys. If keys are passed
+// in, the pool is checked for a matching poller. If at least one
+// of the keys isn't found, an error is returned.
+func (pool *Pool) GetPollers() []string {
+	keys := make([]string, 0, len(pool.db))
+
+	pool.getChan <- struct{}{}
+
+	for k := range pool.outChan {
+		keys = append(keys, k)
+	}
+
+	return keys
 }
