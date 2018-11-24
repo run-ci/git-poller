@@ -7,12 +7,12 @@ import (
 
 type testPoller struct {
 	ch chan struct{}
+
+	pollfn func(context.Context) error
 }
 
-func (plr *testPoller) Poll(ctx context.Context) error {
-	plr.ch <- struct{}{}
-
-	return nil
+func (tp *testPoller) Poll(ctx context.Context) error {
+	return tp.pollfn(ctx)
 }
 
 func TestPoolAdd(t *testing.T) {
@@ -28,7 +28,15 @@ func TestPoolAdd(t *testing.T) {
 		}
 	}()
 
-	pool.AddPoller("test", &testPoller{ch: pollch})
+	plr := &testPoller{ch: pollch}
+
+	plr.pollfn = func(ctx context.Context) error {
+		plr.ch <- struct{}{}
+
+		return nil
+	}
+
+	pool.AddPoller("test", plr)
 
 	select {
 	case <-pollch:
