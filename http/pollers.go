@@ -34,7 +34,7 @@ type gitPoller struct {
 	agent    *run.Agent
 	lastHead string
 
-	queue runlet.Sender
+	queue chan<- []byte
 }
 
 func (gp *gitPoller) Poll(ctx context.Context) error {
@@ -159,13 +159,15 @@ func (gp *gitPoller) checkRepo() error {
 
 			logger = logger.WithField("event", ev)
 
-			err = gp.queue.Send(ev)
+			jsonbuf, err := json.Marshal(ev)
 			if err != nil {
 				logger.WithError(err).
-					Debug("unable to send event on queue, skipping")
+					Debugf("unable to marshal event for %v, skipping", path)
 
 				continue
 			}
+
+			gp.queue <- jsonbuf
 		}
 
 		gp.lastHead = head.String()

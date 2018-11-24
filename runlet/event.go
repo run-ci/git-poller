@@ -33,11 +33,3 @@ type Task struct {
 	Name      string                 `yaml:"name" json:"name"`
 	Arguments map[string]interface{} `yaml:"arguments" json:"arguments"`
 }
-
-// Sender encapsulates the functionality of sending events
-// to runlets or other interested parties. Implementations
-// should track receipts and other things themselves. They
-// should also be thread-safe.
-type Sender interface {
-	Send(Event) error
-}

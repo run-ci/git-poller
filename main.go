@@ -5,7 +5,7 @@ import (
 
 	nats "github.com/nats-io/go-nats"
 	"github.com/run-ci/git-poller/async"
-	"github.com/run-ci/git-poller/runlet"
+	"github.com/run-ci/git-poller/queue"
 
 	"github.com/run-ci/git-poller/http"
 	"github.com/sirupsen/logrus"
@@ -42,10 +42,12 @@ func main() {
 		}
 	}()
 
-	queue, err := runlet.NewNatsSender(natsURL, "pipelines")
+	bus, err := queue.NewNATS(natsURL)
 	if err != nil {
 		logger.WithError(err).Fatal("unable to connect to NATS, shutting down")
 	}
+
+	queue := bus.SenderOn("pipelines")
 
 	srv := http.NewServer(":9002", pool, queue)
 
