@@ -47,6 +47,11 @@ func getNatsConn(url string) (*nats.Conn, error) {
 	return nc, err
 }
 
+// Close shuts down the underlying NATS connection.
+func (q *NATS) Close() {
+	q.conn.Close()
+}
+
 // SenderOn returns a channel to send messages on the given subject.
 func (q *NATS) SenderOn(sub string) chan<- []byte {
 	send := make(chan []byte)

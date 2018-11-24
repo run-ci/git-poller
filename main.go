@@ -47,6 +47,10 @@ func main() {
 		logger.WithError(err).Fatal("unable to connect to NATS, shutting down")
 	}
 
+	logrus.RegisterExitHandler(func() {
+		bus.Close()
+	})
+
 	queue := bus.SenderOn("pipelines")
 
 	srv := http.NewServer(":9002", pool, queue)
