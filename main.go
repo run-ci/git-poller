@@ -5,9 +5,9 @@ import (
 
 	nats "github.com/nats-io/go-nats"
 	"github.com/run-ci/git-poller/async"
+	"github.com/run-ci/git-poller/http"
 	"github.com/run-ci/git-poller/queue"
 
-	"github.com/run-ci/git-poller/http"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,6 +34,8 @@ func init() {
 func main() {
 	logger.Info("booting server...")
 
+	logger.Info("creating async pool")
+
 	pool := async.NewPool()
 	go func() {
 		err := pool.Run()
@@ -41,6 +43,8 @@ func main() {
 			logger.WithError(err).Fatal("unable to start poller pool, shutting down")
 		}
 	}()
+
+	logger.Info("creating NATS bus")
 
 	bus, err := queue.NewNATS(natsURL)
 	if err != nil {
@@ -51,11 +55,28 @@ func main() {
 		bus.Close()
 	})
 
-	queue := bus.SenderOn("pipelines")
+	logger.Info("creating send queue for pipelines")
+	send := bus.SenderOn("pipelines")
 
-	srv := http.NewServer(":9002", pool, queue)
-
-	if err := srv.ListenAndServe(); err != nil {
-		logger.WithField("error", err).Fatal("shutting down server")
+	logger.Info("creating listen queue for pollers")
+	recv, err := bus.ListenerOn("pollers")
+	if err != nil {
+		logger.WithError(err).Fatal("unable to set up pollers subscritpion, shutting down")
 	}
+
+	go func() {
+		httpsrv := http.NewServer(":9002", pool)
+		if err := httpsrv.ListenAndServe(); err != nil {
+			logger.WithError(err).Fatal("got error from HTTP server")
+		}
+	}()
+
+	logger.Info("initializing and running server")
+	srv := server{
+		send: send,
+		recv: recv,
+		pool: pool,
+	}
+
+	srv.run()
 }

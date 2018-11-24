@@ -22,25 +22,22 @@ func init() {
 	logger = logrus.WithField("package", "http")
 }
 
-// Server is a net/http.Server with dependencies like
-// the database connection.
+// Server is a net/http.Server with references to dependencies.
 type Server struct {
 	*http.Server
 
-	pool  *async.Pool
-	queue chan<- []byte
+	pool *async.Pool
 }
 
-// NewServer returns a Server for pollers. It holds a reference to the
-// configured backing pool as well as the queue for sending pipeline events.
-func NewServer(addr string, pool *async.Pool, queue chan<- []byte) *Server {
+// NewServer returns an HTTP server for Pollers. It holds a reference
+// to the configured backing pool.
+func NewServer(addr string, pool *async.Pool) *Server {
 	srv := &Server{
 		Server: &http.Server{
 			Addr: addr,
 		},
 
-		pool:  pool,
-		queue: queue,
+		pool: pool,
 	}
 
 	r := mux.NewRouter()
@@ -48,12 +45,6 @@ func NewServer(addr string, pool *async.Pool, queue chan<- []byte) *Server {
 
 	r.Handle("/", chain(getRoot, setRequestID, logRequest)).
 		Methods(http.MethodGet)
-
-	r.Handle("/pollers", chain(srv.runPoller, setRequestID, logRequest)).
-		Methods(http.MethodPost)
-
-	r.Handle("/pollers", chain(srv.removePoller, setRequestID, logRequest)).
-		Methods(http.MethodDelete)
 
 	r.Handle("/pollers", chain(srv.getPollers, setRequestID, logRequest)).
 		Methods(http.MethodGet)
