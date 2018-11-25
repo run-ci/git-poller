@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	nats "github.com/nats-io/go-nats"
@@ -73,10 +74,43 @@ func main() {
 
 	logger.Info("initializing and running server")
 	srv := server{
-		send: send,
 		recv: recv,
 		pool: pool,
+		mux:  make(map[string]handlerFunc),
 	}
+
+	srv.handleFunc(msgOpCreate, func(msg pollermsg) error {
+		logger := logger.WithFields(logrus.Fields{
+			"remote": msg.Remote,
+			"branch": msg.Branch,
+			"op":     msg.Op,
+		})
+		logger.Info("creating git poller")
+
+		gp := &gitPoller{
+			remote: msg.Remote,
+			branch: msg.Branch,
+			queue:  send,
+		}
+
+		pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)
+
+		return nil
+	})
+
+	srv.handleFunc(msgOpDelete, func(msg pollermsg) error {
+		logger := logger.WithFields(logrus.Fields{
+			"remote": msg.Remote,
+			"branch": msg.Branch,
+			"op":     msg.Op,
+		})
+		logger.Info("deleting git poller")
+
+		key := fmt.Sprintf("%v#%v", msg.Remote, msg.Branch)
+		pool.DeletePoller(key)
+
+		return nil
+	})
 
 	srv.run()
 }

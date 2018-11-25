@@ -22,7 +22,6 @@ type handlerFunc func(pollermsg) error
 
 type server struct {
 	recv <-chan []byte
-	send chan<- []byte
 	pool *async.Pool
 
 	mux map[string]handlerFunc
@@ -41,10 +40,6 @@ func (s *server) handleFunc(op string, fn handlerFunc) {
 
 // TODO: clean shutdown
 func (s *server) run() {
-	// This duplicates the logger so we don't have to worry about sharing it later.
-	logger := logger.WithFields(logrus.Fields{})
-	logger.Debug("running server")
-
 	for raw := range s.recv {
 		logger.Debug("received message")
 
@@ -71,31 +66,12 @@ func (s *server) run() {
 			"remote": msg.Remote,
 			"branch": msg.Branch,
 		})
-		logger.Infof("got %v request", msg.Op)
+		logger.Debugf("got %v request", msg.Op)
 
 		err = fn(msg)
 		if err != nil {
 			logger.WithError(err).
 				Errorf("got error running a handler for %v", msg.Op)
-		}
-
-		switch msg.Op {
-		case msgOpCreate:
-
-			// gp := &gitPoller{
-			// 	remote: msg.Remote,
-			// 	branch: msg.Branch,
-			// 	queue:  s.send,
-			// }
-
-			// s.pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)
-
-		case msgOpDelete:
-
-			// key := fmt.Sprintf("%v#%v", msg.Remote, msg.Branch)
-			// s.pool.DeletePoller(key)
-		default:
-
 		}
 	}
 }
