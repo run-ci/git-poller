@@ -34,7 +34,7 @@ func TestCreatePoller(t *testing.T) {
 		recv: recv,
 		pool: pool,
 
-		mux: make(map[string][]handlerFunc),
+		mux: make(map[string]handlerFunc),
 	}
 
 	tp := testpoller{

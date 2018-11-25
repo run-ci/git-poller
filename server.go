@@ -26,20 +26,18 @@ type server struct {
 	send chan<- []byte
 	pool *async.Pool
 
-	mux map[string][]handlerFunc
+	mux map[string]handlerFunc
 }
 
 func (s *server) handleFunc(op string, fn handlerFunc) {
 	logger := logger.WithField("op", op)
 	logger.Debug("registering handler")
 
-	if _, ok := s.mux[op]; !ok {
-		logger.Debug("first handler for this op")
-		s.mux[op] = []handlerFunc{fn}
-		return
+	if _, ok := s.mux[op]; ok {
+		logger.Warn("overriding previous handler")
 	}
 
-	s.mux[op] = append(s.mux[op], fn)
+	s.mux[op] = fn
 }
 
 // TODO: clean shutdown
@@ -60,13 +58,12 @@ func (s *server) run() {
 
 		switch msg.Op {
 		case msgOpCreate:
-			for _, fn := range s.mux[msgOpCreate] {
-				err := fn(msg)
-				if err != nil {
-					logger.WithError(err).
-						Errorf("got error running a handler for %v", msgOpCreate)
-				}
+			err := s.mux[msgOpCreate](msg)
+			if err != nil {
+				logger.WithError(err).
+					Errorf("got error running a handler for %v", msgOpCreate)
 			}
+
 			// logger := logger.WithFields(logrus.Fields{
 			// 	"remote": msg.Remote,
 			// 	"branch": msg.Branch,
