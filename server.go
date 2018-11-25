@@ -19,10 +19,27 @@ type pollermsg struct {
 	Op     string `json:"op"`
 }
 
+type handlerFunc func(pollermsg) error
+
 type server struct {
 	recv <-chan []byte
 	send chan<- []byte
 	pool *async.Pool
+
+	mux map[string][]handlerFunc
+}
+
+func (s *server) handleFunc(op string, fn handlerFunc) {
+	logger := logger.WithField("op", op)
+	logger.Debug("registering handler")
+
+	if _, ok := s.mux[op]; !ok {
+		logger.Debug("first handler for this op")
+		s.mux[op] = []handlerFunc{fn}
+		return
+	}
+
+	s.mux[op] = append(s.mux[op], fn)
 }
 
 // TODO: clean shutdown
@@ -43,19 +60,26 @@ func (s *server) run() {
 
 		switch msg.Op {
 		case msgOpCreate:
-			logger := logger.WithFields(logrus.Fields{
-				"remote": msg.Remote,
-				"branch": msg.Branch,
-			})
-			logger.Info("got create request")
-
-			gp := &gitPoller{
-				remote: msg.Remote,
-				branch: msg.Branch,
-				queue:  s.send,
+			for _, fn := range s.mux[msgOpCreate] {
+				err := fn(msg)
+				if err != nil {
+					logger.WithError(err).
+						Errorf("got error running a handler for %v", msgOpCreate)
+				}
 			}
+			// logger := logger.WithFields(logrus.Fields{
+			// 	"remote": msg.Remote,
+			// 	"branch": msg.Branch,
+			// })
+			// logger.Info("got create request")
 
-			s.pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)
+			// gp := &gitPoller{
+			// 	remote: msg.Remote,
+			// 	branch: msg.Branch,
+			// 	queue:  s.send,
+			// }
+
+			// s.pool.AddPoller(fmt.Sprintf("%v#%v", gp.remote, gp.branch), gp)
 
 		case msgOpDelete:
 			logger := logger.WithFields(logrus.Fields{
