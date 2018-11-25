@@ -12,13 +12,13 @@ type testpoller struct {
 	ch chan struct{}
 }
 
-func (tp *testpoller) handleCreate(msg pollermsg) error {
+func (tp *testpoller) handleGeneric(msg pollermsg) error {
 	tp.ch <- struct{}{}
 
 	return nil
 }
 
-func TestCreatePoller(t *testing.T) {
+func TestServerHandlers(t *testing.T) {
 	pool := async.NewPool()
 	go func() {
 		err := pool.Run()
@@ -41,26 +41,34 @@ func TestCreatePoller(t *testing.T) {
 		ch: send,
 	}
 
-	srv.handleFunc(msgOpCreate, tp.handleCreate)
+	srv.handleFunc(msgOpCreate, tp.handleGeneric)
+	srv.handleFunc(msgOpDelete, tp.handleGeneric)
 
 	go func() {
 		srv.run()
 	}()
 
-	testmsg := pollermsg{
-		Op: msgOpCreate,
+	tests := []pollermsg{
+		pollermsg{
+			Op: msgOpCreate,
+		},
+		pollermsg{
+			Op: msgOpDelete,
+		},
 	}
 
-	buf, err := json.Marshal(testmsg)
-	if err != nil {
-		t.Fatalf("got error marshalling testmsg: %v", err)
-	}
+	for _, testmsg := range tests {
+		buf, err := json.Marshal(testmsg)
+		if err != nil {
+			t.Fatalf("got error marshalling testmsg: %v", err)
+		}
 
-	recv <- buf
+		recv <- buf
 
-	select {
-	case <-time.After(1 * time.Second):
-		t.Fatalf("expected create handler to be triggered immediately")
-	case <-send:
+		select {
+		case <-time.After(1 * time.Second):
+			t.Fatalf("expected create handler to be triggered immediately")
+		case <-send:
+		}
 	}
 }
