@@ -31,7 +31,9 @@ type Pool struct {
 	getChan chan struct{}
 
 	// This is for output of keys coming from the pool.
-	outChan chan string
+	// Every get request gets its own channel to recieve
+	// the response.
+	outChan chan chan string
 }
 
 // NewPool returns a Pool with all its components initialized.
@@ -45,7 +47,7 @@ func NewPool() *Pool {
 		rmChan:  make(chan string),
 		getChan: make(chan struct{}),
 
-		outChan: make(chan string),
+		outChan: make(chan chan string),
 	}
 }
 
@@ -94,12 +96,14 @@ func (pool *Pool) Run() error {
 		case <-pool.getChan:
 			// In order to keep everything safe without needing a lock, a "get" request
 			// needs to be processed in this loop as well.
+			respch := make(chan string)
+			pool.outChan <- respch
+
 			for k := range pool.db {
-				pool.outChan <- k
+				respch <- k
 			}
 
-			close(pool.outChan)
-			pool.outChan = make(chan string)
+			close(respch)
 		}
 	}
 }
@@ -132,8 +136,9 @@ func (pool *Pool) GetPollers() []string {
 	keys := make([]string, 0, len(pool.db))
 
 	pool.getChan <- struct{}{}
+	respch := <-pool.outChan
 
-	for k := range pool.outChan {
+	for k := range respch {
 		keys = append(keys, k)
 	}
 

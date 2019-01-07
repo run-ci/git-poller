@@ -1,0 +1,19 @@
+---
+summary: Test `git-poller`.
+
+description: |
+  The `test` task runs the unit tests for all packages.
+
+  This task runs in a Linux container. If working on Mac OS
+  make sure to set GOOS appropriately.
+
+image: golang:1.11-stretch
+
+mount: /go/src/github.com/run-ci/git-poller
+
+command: go test -v ./...
+
+arguments:
+  GOOS:
+    description: Platform to build for.
+    default: linux

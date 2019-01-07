@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/run-ci/git-poller/runlet"
-	"github.com/run-ci/run/pkg/run"
 	"github.com/sirupsen/logrus"
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -21,7 +20,6 @@ import (
 type gitPoller struct {
 	remote   string
 	branch   string
-	agent    *run.Agent
 	lastHead string
 
 	queue chan<- []byte
