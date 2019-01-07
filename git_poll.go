@@ -141,21 +141,29 @@ func (gp *gitPoller) checkRepo() error {
 				continue
 			}
 
-			ev.Remote = gp.remote
-			ev.Branch = gp.branch
+			ev.Remote.URL = gp.remote
+			ev.Remote.Branch = gp.branch
 			ev.Name = name
 
 			logger = logger.WithField("event", ev)
 
-			jsonbuf, err := json.Marshal(ev)
-			if err != nil {
-				logger.WithError(err).
-					Debugf("unable to marshal event for %v, skipping", path)
+			// Only trigger this specific pipeline if the pipeline specifies
+			// the branch that is currently being listened to. If the pipeline
+			// specifies a branch that's being handled by another poller, it
+			// should be ignored.
+			if gp.branch == ev.Branch {
+				logger.Debug("pipeline branch matches poller branch, triggering pipeline run")
+				jsonbuf, err := json.Marshal(ev)
+				if err != nil {
+					logger.WithError(err).
+						Debugf("unable to marshal event for %v, skipping", path)
 
-				continue
+					continue
+				}
+
+				gp.queue <- jsonbuf
 			}
 
-			gp.queue <- jsonbuf
 		}
 
 		gp.lastHead = head.String()
